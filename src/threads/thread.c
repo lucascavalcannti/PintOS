@@ -242,7 +242,7 @@ thread_unblock (struct thread *t)
 
   old_level = intr_disable ();
   ASSERT (t->status == THREAD_BLOCKED);
-  list_insert_ordered (&ready_list, &t->elem, thread_compare, NULL); // Mudei aqui pra dar certo a parte de alarm priority
+  list_insert_ordered (&ready_list, &t->elem, thread_compare_priority, NULL); // Mudei aqui pra dar certo a parte de alarm priority
   t->status = THREAD_READY;
   intr_set_level (old_level);
 }
@@ -324,6 +324,13 @@ bool thread_compare(const struct list_elem *a, const struct list_elem *b, void *
   struct thread *ta = list_entry(a, struct thread, elem);
   struct thread *tb = list_entry(b, struct thread, elem);
   return ta->wakeup_tick < tb->wakeup_tick;
+}
+
+// Usado em thread_unblock
+bool thread_compare_priority(const struct list_elem *a, const struct list_elem *b, void *aux) {
+  struct thread *ta = list_entry(a, struct thread, elem);
+  struct thread *tb = list_entry(b, struct thread, elem);
+  return ta->priority > tb->priority;
 }
 
 // Adicionado
