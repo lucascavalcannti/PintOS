@@ -25,6 +25,9 @@
    that are ready to run but not actually running. */
 static struct list ready_list;
 
+// Lista de threads no estado sleep
+static struct list sleep_list;
+
 /* List of all processes.  Processes are added to this list
    when they are first scheduled and removed when they exit. */
 static struct list all_list;
@@ -92,6 +95,7 @@ thread_init (void)
 
   lock_init (&tid_lock);
   list_init (&ready_list);
+  list_init (&sleep_list);
   list_init (&all_list);
 
   /* Set up a thread structure for the running thread. */
@@ -315,6 +319,48 @@ thread_yield (void)
   intr_set_level (old_level);
 }
 
+// Adicionado
+bool thread_compare(const struct list_elem *a, const struct list_elem *b, void *aux) {
+  struct thread *ta = list_entry(a, struct thread, elem);
+  struct thread *tb = list_entry(b, struct thread, elem);
+  return ta->wakeup_tick < tb->wakeup_tick;
+}
+
+// Adicionado
+void
+thread_sleep (int64_t ticks) {
+  struct thread *atual = thread_current();
+  enum intr_level old_level;
+
+  if (ticks <= 0) return;
+
+  old_level = intr_disable();
+
+  if (atual != idle_thread) {
+    atual->wakeup_tick = ticks;
+    list_insert_ordered(&sleep_list, &atual->elem, thread_compare, NULL);
+    thread_block();
+  }
+
+  intr_set_level(old_level);
+}
+
+// Adicionado
+void
+thread_wakeup (int64_t current_tick) { // chamada em timer_interrupt
+  struct list_elem *e = list_begin(&sleep_list);
+
+  while (e != list_end(&sleep_list)) {
+    struct thread *t = list_entry (e, struct thread, elem);
+
+    if (t->wakeup_tick <= current_tick) {
+      e = list_remove(e);
+      thread_unblock(t);
+    }
+    else break;
+  }
+}
+
 /* Invoke function 'func' on all threads, passing along 'aux'.
    This function must be called with interrupts off. */
 void
@@ -464,6 +510,7 @@ init_thread (struct thread *t, const char *name, int priority)
   t->stack = (uint8_t *) t + PGSIZE;
   t->priority = priority;
   t->magic = THREAD_MAGIC;
+  t->wakeup_tick = 0;
 
   old_level = intr_disable ();
   list_push_back (&all_list, &t->allelem);
