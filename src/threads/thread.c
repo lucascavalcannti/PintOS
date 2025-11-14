@@ -21,9 +21,14 @@
 #define THREAD_MAGIC 0xcd6abf4b
 #define A 55
 
+//adicao MLFQ 
+static int load_avg; /* Carga média do sistema (PONTO FIXO) */
+
 /* List of processes in THREAD_READY state, that is, processes
    that are ready to run but not actually running. */
-static struct list ready_list;
+
+//static struct list ready_list; ja estava no projeto e foi comentado
+static struct list ready_queues[PRI_MAX + 1]; /* 64 listas de prontos */
 
 // Lista de threads no estado sleep
 static struct list sleep_list;
@@ -91,10 +96,15 @@ static tid_t allocate_tid (void);
 void
 thread_init (void) 
 {
+  load_avg = 0; // adicionado
+   
   ASSERT (intr_get_level () == INTR_OFF);
 
   lock_init (&tid_lock);
-  list_init (&ready_list);
+  //list_init (&ready_list); adicionado
+  for (int i = PRI_MIN; i <= PRI_MAX; i++) {
+      list_init(&ready_queues[i]);
+  } 
   list_init (&sleep_list);
   list_init (&all_list);
 
@@ -110,6 +120,9 @@ thread_init (void)
 void
 thread_start (void) 
 {
+  initial_thread->nice = 0;//adicionado
+  initial_thread->recent_cpu = 0;//adicionado
+   
   /* Create the idle thread. */
   struct semaphore idle_started;
   sema_init (&idle_started, 0);
@@ -171,6 +184,11 @@ tid_t
 thread_create (const char *name, int priority,
                thread_func *function, void *aux) 
 {
+   //adicao MLFQ
+  struct thread *cur = thread_current ();
+  t->nice = cur->nice;
+  t->recent_cpu = cur->recent_cpu;
+
   struct thread *t;
   struct kernel_thread_frame *kf;
   struct switch_entry_frame *ef;
@@ -245,6 +263,9 @@ thread_unblock (struct thread *t)
   list_insert_ordered (&ready_list, &t->elem, thread_compare_priority, NULL); // Mudei aqui pra dar certo a parte de alarm priority
   t->status = THREAD_READY;
   intr_set_level (old_level);
+
+  /* Insere na fila de prontos de prioridade correta */
+  list_push_back(&ready_queues[t->priority], &t->elem);
 }
 
 /* Returns the name of the running thread. */
@@ -313,7 +334,8 @@ thread_yield (void)
 
   old_level = intr_disable ();
   if (cur != idle_thread) 
-    list_push_back (&ready_list, &cur->elem);
+    //list_push_back (&ready_list, &cur->elem);
+     list_push_back(&ready_queues[cur->priority], &cur->elem);
   cur->status = THREAD_READY;
   schedule ();
   intr_set_level (old_level);
