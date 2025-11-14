@@ -90,6 +90,10 @@ struct thread
     int priority;                       /* Priority. */
     struct list_elem allelem;           /* List element for all threads list. */
 
+    // adicao MLFQ
+    int nice;           /* Valor de 'nice' da thread (inteiro) */
+    int recent_cpu;     /* CPU recente (PONTO FIXO) */
+
     /* Shared between thread.c and synch.c. */
     struct list_elem elem;              /* List element. */
 
