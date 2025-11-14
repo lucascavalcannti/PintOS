@@ -1,3 +1,4 @@
+#include "threads/fixed-point.h" // adicionado
 #include "threads/thread.h"
 #include <debug.h>
 #include <stddef.h>
